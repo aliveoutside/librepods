@@ -350,56 +350,67 @@ object MediaController {
 //        }
 //    }
 
+    /**
+     * Lowers the media volume while the user is speaking. The volume from before the first
+     * duck is remembered so [stopSpeaking] can restore it. Never raises the volume: if it is
+     * already below the requested level, it is left alone.
+     */
     @Synchronized
-    fun setVolume(volumePercent: Int) {
+    fun duckVolume(volumePercent: Int) {
+        val current = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
+        val original = initialVolume ?: current.also { initialVolume = it }
+
         val maxVolume = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
-        val targetVolume = maxVolume * volumePercent / 100
-
-        smoothVolumeTransition(
-            audioManager.getStreamVolume(AudioManager.STREAM_MUSIC),
-            targetVolume,
-        )
-    }
-
-    @Synchronized
-    fun startSpeaking() {
-        if (initialVolume == null) {
-            initialVolume = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
-        }
+        val targetVolume = (maxVolume * volumePercent / 100).coerceIn(0, original)
 
         Log.d(
             "MediaController",
-            "Starting speaking, initial volume: $initialVolume",
+            "Ducking volume, original: $original, current: $current, target: $targetVolume",
         )
+        smoothVolumeTransition(targetVolume)
     }
-
 
     @Synchronized
     fun stopSpeaking() {
         val original = initialVolume ?: return
-
-        smoothVolumeTransition(
-            audioManager.getStreamVolume(AudioManager.STREAM_MUSIC),
-            original,
-        )
-
         initialVolume = null
+
+        Log.d("MediaController", "Stopping speaking, restoring volume to $original")
+        smoothVolumeTransition(original)
     }
 
-    private fun smoothVolumeTransition(fromVolume: Int, toVolume: Int) {
-        Log.d("MediaController", "Smooth volume transition from $fromVolume to $toVolume")
-        val step = if (fromVolume < toVolume) 1 else -1
-        val delay = 50L
-        var currentVolume = fromVolume
+    private var volumeTransition: Runnable? = null
 
-        handler.post(object : Runnable {
+    // Only one transition may run at a time, otherwise an unfinished ramp keeps fighting
+    // the new one (e.g. a duck that is still in progress when the restore starts).
+    @Synchronized
+    private fun smoothVolumeTransition(toVolume: Int) {
+        volumeTransition?.let { handler.removeCallbacks(it) }
+
+        val delay = 50L
+        val transition = object : Runnable {
             override fun run() {
-                if (currentVolume != toVolume) {
-                    currentVolume += step
-                    audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, currentVolume, 0)
+                synchronized(MediaController) {
+                    if (volumeTransition !== this) return
+
+                    val currentVolume = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
+                    if (currentVolume == toVolume) {
+                        volumeTransition = null
+                        return
+                    }
+
+                    val step = if (currentVolume < toVolume) 1 else -1
+                    audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, currentVolume + step, 0)
+                    if (audioManager.getStreamVolume(AudioManager.STREAM_MUSIC) == currentVolume) {
+                        // the system refused the change (fixed volume, DND...), don't loop forever
+                        volumeTransition = null
+                        return
+                    }
                     handler.postDelayed(this, delay)
                 }
             }
-        })
+        }
+        volumeTransition = transition
+        handler.post(transition)
     }
 }
