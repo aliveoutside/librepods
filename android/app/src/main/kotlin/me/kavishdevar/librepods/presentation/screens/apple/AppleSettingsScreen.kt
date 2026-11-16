@@ -440,7 +440,7 @@ fun AppleSettingsScreen(
                     ) {
                         Text(
                             stringResource(R.string.unlock_advanced_features),
-                            style = MaterialTheme.typography.bodyMedium,
+                            style = MaterialTheme.typography.labelLarge,
                             color = MaterialTheme.colorScheme.onPrimary
                         )
                     }
@@ -610,7 +610,7 @@ fun AppleSettingsScreen(
                 ) {
                     Text(
                         text = stringResource(R.string.disconnect),
-                        style = MaterialTheme.typography.bodyMedium,
+                        style = MaterialTheme.typography.labelLarge,
                         textAlign = TextAlign.Start,
                         modifier = Modifier.fillMaxWidth()
                     )

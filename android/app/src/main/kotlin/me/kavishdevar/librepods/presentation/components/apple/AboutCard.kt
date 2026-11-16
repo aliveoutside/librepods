@@ -20,11 +20,13 @@
 
 package me.kavishdevar.librepods.presentation.components.apple
 
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import me.kavishdevar.librepods.R
@@ -72,8 +74,8 @@ fun AboutCard(
                 Text(
                     text = serialNumbers[serialNumber.intValue].text,
                     inlineContent = serialNumbers[serialNumber.intValue].inlineContent,
-                    style = if (design.system == DesignSystem.Apple) MaterialTheme.typography.bodyMedium else MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurface.copy(0.7f),
+                    style = if (design.system == DesignSystem.Apple) MaterialTheme.typography.bodyMedium else LocalTextStyle.current,
+                    color = if (design.system == DesignSystem.Apple) MaterialTheme.colorScheme.onSurface.copy(0.7f) else Color.Unspecified,
                 )
             },
             onClick = { serialNumber.intValue = (serialNumber.intValue + 1) % serialNumbers.size }

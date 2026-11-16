@@ -56,12 +56,12 @@ fun StyledList(
                 modifier = Modifier
                     .background(if (surfaceColor.isSpecified) surfaceColor else if (design.colorStyle == ColorStyle.Custom) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.surfaceContainer)
                     .padding(horizontal = 16.dp)
-                    .padding(top = 4.dp, bottom = if (m3eEnabled) 12.dp else 4.dp)
+                    .padding(top = if (m3eEnabled) 8.dp else 4.dp, bottom = 8.dp)
             ) {
                 Text(
                     text = it,
                     color = if (m3eEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.sectionHeader,
-                    style = MaterialTheme.typography.labelMediumEmphasized
+                    style = if (m3eEnabled) MaterialTheme.typography.titleSmall else MaterialTheme.typography.labelMediumEmphasized
                 )
             }
         }
@@ -80,16 +80,16 @@ fun StyledList(
             if (m3eEnabled && description != null) {
                 Text(
                     text = description,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onBackground.copy(0.8f),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(horizontal = 16.dp)
                 )
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(12.dp))
             }
             scope.items.forEachIndexed { index, item ->
                 item(index, scope.items.size)
             }
-            Spacer(modifier = Modifier.height(if(m3eEnabled) 4.dp else 0.dp))
+
         }
         if (!m3eEnabled && description != null) {
             Box(

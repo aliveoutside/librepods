@@ -136,7 +136,7 @@ fun AppSettingsScreen(
                 ) {
                     Text(
                         stringResource(R.string.unlock_advanced_features),
-                        style = MaterialTheme.typography.bodyMedium,
+                        style = MaterialTheme.typography.labelLarge,
                         color = MaterialTheme.colorScheme.onPrimary
                     )
                 }

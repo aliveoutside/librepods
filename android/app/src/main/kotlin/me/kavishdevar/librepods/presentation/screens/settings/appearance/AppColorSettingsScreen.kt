@@ -207,14 +207,10 @@ fun AppColorSettingsScreen(
             Spacer(modifier = Modifier.height(topPadding))
 
             StyledList {
-                styledListItem(
-                    contentText = stringResource(R.string.default_option),
-                    selected = colorStyle == ColorStyle.Default,
-                    onClick = { onColorStyleChanged(ColorStyle.Default) }
-                )
+                // "Default" was the iOS palette, it now means wallpaper colors
                 styledListItem(
                     contentText = stringResource(R.string.wallpaper),
-                    selected = colorStyle == ColorStyle.Wallpaper,
+                    selected = colorStyle == ColorStyle.Wallpaper || colorStyle == ColorStyle.Default,
                     onClick = { onColorStyleChanged(ColorStyle.Wallpaper) }
                 )
                 styledListItem(

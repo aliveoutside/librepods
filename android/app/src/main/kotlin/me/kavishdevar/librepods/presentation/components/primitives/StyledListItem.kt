@@ -114,7 +114,7 @@ fun StyledListItem(
                 Text(
                     text = it,
                     color = if (m3eEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.sectionHeader,
-                    style = MaterialTheme.typography.bodyMediumEmphasized
+                    style = if (m3eEnabled) MaterialTheme.typography.titleSmall else MaterialTheme.typography.bodyMediumEmphasized
                 )
             }
         }
@@ -188,7 +188,7 @@ fun StyledListItem(
                 Text(
                     text = it,
                     color = if (m3eEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.sectionHeader,
-                    style = MaterialTheme.typography.bodyMediumEmphasized
+                    style = if (m3eEnabled) MaterialTheme.typography.titleSmall else MaterialTheme.typography.bodyMediumEmphasized
                 )
             }
         }
@@ -215,10 +215,7 @@ fun StyledListItem(
                         }
 
                         DesignSystem.Material -> {
-                            Text(
-                                text = contentText,
-                                style = MaterialTheme.typography.bodyMediumEmphasized,
-                            )
+                            Text(text = contentText)
                         }
                     }
                 },
@@ -280,7 +277,7 @@ fun StyledListItem(
                 Text(
                     text = it,
                     color = if (m3eEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.sectionHeader,
-                    style = MaterialTheme.typography.bodyMediumEmphasized
+                    style = if (m3eEnabled) MaterialTheme.typography.titleSmall else MaterialTheme.typography.bodyMediumEmphasized
                 )
             }
         }
@@ -307,10 +304,7 @@ fun StyledListItem(
                         }
 
                         DesignSystem.Material -> {
-                            Text(
-                                text = contentText,
-                                style = MaterialTheme.typography.bodyMediumEmphasized,
-                            )
+                            Text(text = contentText)
                         }
                     }
                 },
@@ -372,7 +366,7 @@ fun StyledListItem(
                 Text(
                     text = it,
                     color = if (m3eEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.sectionHeader,
-                    style = MaterialTheme.typography.bodyMediumEmphasized
+                    style = if (m3eEnabled) MaterialTheme.typography.titleSmall else MaterialTheme.typography.bodyMediumEmphasized
                 )
             }
         }
@@ -399,20 +393,21 @@ fun StyledListItem(
                         }
 
                         DesignSystem.Material -> {
-                            Text(
-                                text = contentText,
-                                style = MaterialTheme.typography.bodyMediumEmphasized,
-                            )
+                            Text(text = contentText)
                         }
                     }
                 },
                 supportingContent = if (supportingText != null && (design.system == DesignSystem.Material || orientation == StyledListItemOrientation.Horizontal)) {
                     @Composable {
-                        Text(
-                            text = supportingText,
-                            style = if (design.system == DesignSystem.Apple && orientation == StyledListItemOrientation.Horizontal) MaterialTheme.typography.bodyMedium else MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurface.copy(0.7f),
-                        )
+                        if (design.system == DesignSystem.Material) {
+                            Text(text = supportingText)
+                        } else {
+                            Text(
+                                text = supportingText,
+                                style = if (orientation == StyledListItemOrientation.Horizontal) MaterialTheme.typography.bodyMedium else MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurface.copy(0.7f),
+                            )
+                        }
                     }
                 } else null,
                 height = height,
@@ -484,10 +479,7 @@ fun StyledListScope.styledListItem(
                     }
 
                     DesignSystem.Material -> {
-                        Text(
-                            text = contentText,
-                            style = MaterialTheme.typography.bodyMediumEmphasized,
-                        )
+                        Text(text = contentText)
                     }
                 }
             },
@@ -593,10 +585,7 @@ fun StyledListScope.styledListItem(
                     }
 
                     DesignSystem.Material -> {
-                        Text(
-                            text = contentText,
-                            style = MaterialTheme.typography.bodyMediumEmphasized,
-                        )
+                        Text(text = contentText)
                     }
                 }
             },
@@ -657,20 +646,21 @@ fun StyledListScope.styledListItem(
                     }
 
                     DesignSystem.Material -> {
-                        Text(
-                            text = contentText,
-                            style = MaterialTheme.typography.bodyMedium,
-                        )
+                        Text(text = contentText)
                     }
                 }
             },
             supportingContent = if (supportingText != null) {
                    @Composable {
-                        Text(
-                            text = supportingText,
-                            style = if (design.system == DesignSystem.Apple && orientation == StyledListItemOrientation.Horizontal) MaterialTheme.typography.bodyMedium else MaterialTheme.typography.bodySmall,
-                            color = if (design.system == DesignSystem.Material) LocalContentColor.current.copy(0.7f) else MaterialTheme.colorScheme.onSurface.copy(0.7f), // TODO: move to color scheme
-                        )
+                        if (design.system == DesignSystem.Material) {
+                            Text(text = supportingText)
+                        } else {
+                            Text(
+                                text = supportingText,
+                                style = if (orientation == StyledListItemOrientation.Horizontal) MaterialTheme.typography.bodyMedium else MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurface.copy(0.7f),
+                            )
+                        }
                     }
                 } else null,
             enabled = enabled,
@@ -896,34 +886,10 @@ private fun StyledListItemContent(
         }
 
         DesignSystem.Material -> {
-            val defaultShape = when {
-                count == 1 -> RoundedCornerShape(24.dp)
-
-                index == 0 -> RoundedCornerShape(
-                    topStart = 24.dp,
-                    topEnd = 24.dp,
-                    bottomStart = 8.dp,
-                    bottomEnd = 8.dp
-                )
-
-                index == count - 1 -> RoundedCornerShape(
-                    topStart = 8.dp,
-                    topEnd = 8.dp,
-                    bottomStart = 24.dp,
-                    bottomEnd = 24.dp
-                )
-
-                else -> RoundedCornerShape(8.dp)
-            }
             Column {
                 SegmentedListItem(
-                    modifier = modifier.heightIn(min = 64.dp),
-                    shapes = ListItemDefaults.shapes().copy(
-                        shape = defaultShape,
-                        pressedShape = RoundedCornerShape(24.dp),
-                        selectedShape = RoundedCornerShape(24.dp),
-                        hoveredShape = RoundedCornerShape(24.dp),
-                    ),
+                    modifier = modifier,
+                    shapes = ListItemDefaults.segmentedShapes(index = index, count = count),
                     onClick = onClick ?: {},
                     leadingContent = leadingContent,
                     trailingContent = {
@@ -935,14 +901,6 @@ private fun StyledListItemContent(
                                         contentDescription = null,
                                         modifier = Modifier
                                             .size(24.dp),
-                                    )
-                                } else if (selected == null) {
-                                    Icon(
-                                        imageVector = LocalIcons.current.ChevronRight,
-                                        contentDescription = null,
-                                        modifier = Modifier
-                                            .size(24.dp)
-                                            .padding(start = if (supportingContent != null && orientation == StyledListItemOrientation.Horizontal) 6.dp else 0.dp)
                                     )
                                 }
                             }
@@ -958,7 +916,7 @@ private fun StyledListItemContent(
                     selected = selected ?: false,
                 )
                 if (index+1 != count) {
-                    Spacer(modifier = Modifier.height(2.dp))
+                    Spacer(modifier = Modifier.height(ListItemDefaults.SegmentedGap))
                 }
             }
         }

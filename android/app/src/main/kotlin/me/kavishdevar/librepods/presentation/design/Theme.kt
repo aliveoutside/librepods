@@ -24,10 +24,8 @@ import androidx.compose.material3.MaterialExpressiveTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MotionScheme
 import androidx.compose.material3.Typography
-import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
-import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.graphics.Color
@@ -44,6 +42,7 @@ import dev.chrisbanes.haze.glass.LocalGlassAccessibilitySettings
 import me.kavishdevar.librepods.data.app.AccessibilitySettings
 import me.kavishdevar.librepods.data.app.ColorStyle
 import me.kavishdevar.librepods.data.app.Design
+import me.kavishdevar.librepods.data.app.DesignSystem
 import me.kavishdevar.librepods.data.app.FontFamilyOption
 import me.kavishdevar.librepods.data.app.FontSettings
 import me.kavishdevar.librepods.data.app.IconStyle
@@ -58,44 +57,6 @@ import me.kavishdevar.librepods.presentation.icons.MaterialIcons
 val ColorScheme.sectionHeader: Color
     get() = onBackground.copy(alpha = 0.6f)
 
-private val DefaultDarkColorScheme = darkColorScheme(
-    background = Color(0xFF000000),
-    onBackground = Color(0xFFFFFFFF),
-    surfaceContainer = Color(0xFF000000),
-    onSurface = Color(0xFFFFFFFF),
-    surfaceDim = Color(0x40888888),
-    primary = Color(0xFF0091FF),
-    onPrimary = Color(0xFFFFFFFF),
-    primaryContainer = Color(0xFF003258),
-    onPrimaryContainer = Color(0xFFB3D9FF),
-    secondaryContainer = Color(0xFF366AA8),
-    onSecondaryContainer = Color(0xFFF2F0E8),
-    tertiary = Color(0xFFEA7B00),
-    scrim = Color(0x8C000000),
-    surfaceContainerLow = Color(0xFF2C2C2E),
-    surfaceContainerHigh = Color(0xFF1C1C1E),
-    surfaceContainerHighest = Color(0xFF545454)
-)
-
-private val DefaultLightColorScheme = lightColorScheme(
-    background = Color(0xFFF2F2F7),
-    onBackground = Color(0xFF000000),
-    surfaceContainer = Color(0xFFF2F2F7),
-    onSurface = Color(0xFF000000),
-    surfaceDim = Color(0x40D9D9D9),
-    primary = Color(0xFF0088FF),
-    onPrimary = Color(0xFFFFFFFF),
-    primaryContainer = Color(0xFFB3D9FF),
-    onPrimaryContainer = Color(0xFF003258),
-    secondaryContainer = Color(0xFF6BC0FF),
-    onSecondaryContainer = Color(0xFF183B56),
-    tertiary = Color(0xFFEA7B00),
-    scrim = Color(0xD9F2F2F7),
-    surfaceContainerLow = Color(0xFFE7E7E7),
-    surfaceContainerHigh = Color(0xFFFFFFFF),
-    surfaceContainerHighest = Color(0xFF8D8D8D)
-)
-
 @Composable
 fun LibrePodsTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
@@ -104,6 +65,15 @@ fun LibrePodsTheme(
     fontSettings: FontSettings = FontSettings(),
     content: @Composable () -> Unit
 ) {
+    // The app is Material 3 Expressive only now: the iOS-style design, Apple icons and the
+    // iOS color palette are no longer offered, whatever is stored in older settings.
+    @Suppress("NAME_SHADOWING")
+    val design = design.copy(
+        system = DesignSystem.Material,
+        iconStyle = IconStyle.Material,
+        colorStyle = if (design.colorStyle == ColorStyle.Custom) ColorStyle.Custom else ColorStyle.Wallpaper,
+    )
+
     val typography = when(fontSettings.fontFamilyOption) {
         FontFamilyOption.SystemDefault -> Typography()
         FontFamilyOption.RobotoFlex -> RobotoFlexTypography
@@ -136,8 +106,7 @@ fun LibrePodsTheme(
                     style = design.paletteStyle,
                 )
             }
-            ColorStyle.Default -> if (darkTheme) DefaultDarkColorScheme else DefaultLightColorScheme
-            ColorStyle.Wallpaper -> if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
+            ColorStyle.Default, ColorStyle.Wallpaper -> if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
         }
 
         MaterialExpressiveTheme(

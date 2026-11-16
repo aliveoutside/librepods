@@ -35,6 +35,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItemColors
 import androidx.compose.material3.ListItemDefaults
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SegmentedListItem
 import androidx.compose.material3.Switch
@@ -91,10 +92,10 @@ fun StyledToggle(
             Text(
                 text = it,
                 color = if (m3eEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.sectionHeader,
-                style = MaterialTheme.typography.bodyMediumEmphasized,
+                style = if (m3eEnabled) MaterialTheme.typography.titleSmall else MaterialTheme.typography.bodyMediumEmphasized,
                 modifier = Modifier
                     .padding(horizontal = 16.dp)
-                    .padding(top = 4.dp, bottom = if (m3eEnabled) 12.dp else 4.dp)
+                    .padding(top = 4.dp, bottom = if (m3eEnabled) 8.dp else 4.dp)
             )
         }
         Column(
@@ -203,33 +204,13 @@ private fun StyledToggleContent(
     val m3eEnabled = design.system == DesignSystem.Material
 
     if (m3eEnabled) {
-        val defaultShape = when {
-            count == 1 -> RoundedCornerShape(24.dp)
-
-            index == 0 -> RoundedCornerShape(
-                topStart = 24.dp,
-                topEnd = 24.dp,
-                bottomStart = 8.dp,
-                bottomEnd = 8.dp
-            )
-
-            index == count - 1 -> RoundedCornerShape(
-                topStart = 8.dp,
-                topEnd = 8.dp,
-                bottomStart = 24.dp,
-                bottomEnd = 24.dp
-            )
-
-            else -> RoundedCornerShape(8.dp)
-        }
         Column (modifier = modifier) {
             SegmentedListItem(
-                shapes = ListItemDefaults.shapes().copy(
-                    shape = defaultShape,
-                    pressedShape = RoundedCornerShape(24.dp),
-                    selectedShape = RoundedCornerShape(24.dp),
-                    hoveredShape = RoundedCornerShape(24.dp),
-                ),
+                shapes = if (header) {
+                    ListItemDefaults.shapes(shape = RoundedCornerShape(percent = 50))
+                } else {
+                    ListItemDefaults.segmentedShapes(index = index, count = count)
+                },
                 onClick = { onCheckedChange(!currentChecked) },
                 trailingContent = {
                     Switch(
@@ -253,12 +234,8 @@ private fun StyledToggleContent(
                     {
                         Text(
                             text = it,
-                            style = MaterialTheme.typography.bodySmall,
                             modifier = Modifier
-                                .padding(
-                                    top = if (header) 2.dp else 4.dp,
-                                    bottom = if (header) 8.dp else 4.dp
-                                )
+                                .padding(bottom = if (header) 8.dp else 0.dp)
                                 .padding(horizontal = if (header) 8.dp else 0.dp),
                             color = if (header && enabled) MaterialTheme.colorScheme.onPrimaryContainer else Color.Unspecified
                         )
@@ -267,23 +244,20 @@ private fun StyledToggleContent(
                 content = {
                     Text(
                         text = label,
-                        style = MaterialTheme.typography.bodyMediumEmphasized,
+                        style = if (header) MaterialTheme.typography.titleMedium else LocalTextStyle.current,
                         modifier = Modifier
-                            .padding(
-                                top = if (header) 8.dp else 4.dp,
-                                bottom = if (header) 2.dp else 4.dp
-                            )
+                            .padding(top = if (header) 8.dp else 0.dp)
                             .padding(horizontal = if (header) 8.dp else 0.dp),
                         color = if (header && enabled) MaterialTheme.colorScheme.onPrimaryContainer else Color.Unspecified
                     )
                 },
                 enabled = enabled,
                 verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.heightIn(min = 64.dp),
+                modifier = Modifier.heightIn(min = if (header) 72.dp else 0.dp),
                 colors = colors
             )
             if (index+1 != count) {
-                Spacer(modifier = Modifier.height(2.dp))
+                Spacer(modifier = Modifier.height(ListItemDefaults.SegmentedGap))
             }
         }
     } else {

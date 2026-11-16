@@ -234,7 +234,7 @@ fun BatteryIndicator(
                 Text(
                     text = richText.text,
                     inlineContent = richText.inlineContent,
-                    style = MaterialTheme.typography.labelMedium,
+                    style = MaterialTheme.typography.labelLarge,
                     color = color,
                 )
             }

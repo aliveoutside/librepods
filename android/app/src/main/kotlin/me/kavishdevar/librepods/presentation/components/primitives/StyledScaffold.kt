@@ -68,6 +68,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
@@ -130,9 +131,13 @@ fun StyledScaffold(
 
     when (design.system) {
         DesignSystem.Material -> {
+            // the bar takes a tonal color once content scrolls under it
+            val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
+
             // Material pages use Material navigation transitions (see AppNavGraph), they are
             // not stacked like cards, so no shadow or screen-corner clipping is needed here.
             Scaffold(
+                modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
                 containerColor = if (design.colorStyle == ColorStyle.Custom) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.surfaceContainer,
                 snackbarHost = { SnackbarHost(snackbarHostState) },
                 topBar = {
@@ -173,7 +178,7 @@ fun StyledScaffold(
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis,
                                         modifier = Modifier.padding(start = if (navigateBack != null) 8.dp else 12.dp, end = 12.dp),
-                                        style = MaterialTheme.typography.titleLargeEmphasized
+                                        style = MaterialTheme.typography.titleLarge
                                     )
                                 }
                             },
@@ -186,7 +191,11 @@ fun StyledScaffold(
                             modifier = if (design.blurTopBarInMaterial) Modifier.hazeBlur(
                                 input = HazeInput.Sources(hazeState),
                             ) else Modifier,
-                            colors = TopAppBarDefaults.topAppBarColors().copy(containerColor = if (design.blurTopBarInMaterial) Color.Transparent else if (design.colorStyle == ColorStyle.Custom) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.surfaceContainer)
+                            scrollBehavior = scrollBehavior,
+                            colors = TopAppBarDefaults.topAppBarColors(
+                                containerColor = if (design.blurTopBarInMaterial) Color.Transparent else if (design.colorStyle == ColorStyle.Custom) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.surfaceContainer,
+                                scrolledContainerColor = if (design.blurTopBarInMaterial) Color.Transparent else MaterialTheme.colorScheme.surfaceContainerHigh,
+                            )
                         )
                     }
                 },

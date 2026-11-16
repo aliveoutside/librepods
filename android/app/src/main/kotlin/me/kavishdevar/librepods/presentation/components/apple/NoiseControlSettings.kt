@@ -162,10 +162,10 @@ fun NoiseControlSettings(
                     Text(
                         text = stringResource(R.string.listening_mode),
                         color = MaterialTheme.colorScheme.primary,
-                        style = MaterialTheme.typography.labelSmallEmphasized,
+                        style = MaterialTheme.typography.titleSmall,
                         modifier = Modifier
                             .padding(horizontal = 16.dp)
-                            .padding(top = 4.dp, bottom = 12.dp)
+                            .padding(top = 8.dp, bottom = 8.dp)
                     )
                 }
                 Row(
@@ -205,7 +205,7 @@ fun NoiseControlSettings(
                                 Spacer(modifier = Modifier.height(2.dp))
                                 Text(
                                     text = stringResource(labelRes),
-                                    style = MaterialTheme.typography.labelSmall,
+                                    style = MaterialTheme.typography.labelLarge,
                                     textAlign = TextAlign.Center,
                                     maxLines = 2,
                                     modifier = Modifier.fillMaxWidth()

@@ -114,43 +114,6 @@ fun AppAppearanceSettingsScreen(
                 )
             }
 
-            StyledList(
-                title = stringResource(R.string.design_system),
-            ) {
-                styledListItem(
-                    contentText = stringResource(R.string.apple),
-                    selected = designSystem == DesignSystem.Apple,
-                    onClick = {
-                        onDesignSystemChanged(DesignSystem.Apple)
-                        onFontSettingsChanged(fontSettings.copy(fontFamilyOption = FontFamilyOption.Inter))
-                        onIconStyleChanged(IconStyle.Apple)
-                    },
-                )
-
-                styledListItem(
-                    contentText = stringResource(R.string.material3e),
-                    selected = designSystem == DesignSystem.Material,
-                    onClick = {
-                        onDesignSystemChanged(DesignSystem.Material)
-                        onFontSettingsChanged(fontSettings.copy(fontFamilyOption = FontFamilyOption.RobotoFlexExpressive))
-                        onIconStyleChanged(IconStyle.Material)
-                    },
-                )
-            }
-
-            StyledList(title = stringResource(R.string.icons)) {
-                styledListItem(
-                    contentText = stringResource(R.string.material_symbols),
-                    selected = iconStyle == IconStyle.Material,
-                    onClick = { onIconStyleChanged(IconStyle.Material) },
-                )
-                styledListItem(
-                    contentText = stringResource(R.string.apple),
-                    selected = iconStyle == IconStyle.Apple,
-                    onClick = { onIconStyleChanged(IconStyle.Apple) },
-                )
-            }
-
             StyledList(title = stringResource(R.string.font)) {
                 styledListItem(
                     contentText = stringResource(R.string.system),
@@ -177,11 +140,6 @@ fun AppAppearanceSettingsScreen(
             StyledListItem(
                 contentText = stringResource(R.string.color),
                 onClick = navigateToAppColorSettingsScreen
-            )
-
-            StyledListItem(
-                contentText = stringResource(R.string.blur_and_glass_effects),
-                onClick = navigateToHazeSettingsScreen
             )
 
             Spacer(modifier = Modifier.height(bottomPadding))

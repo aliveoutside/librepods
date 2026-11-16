@@ -1,99 +1,86 @@
 package me.kavishdevar.librepods.presentation.design.typography
 
 import androidx.compose.material3.Typography
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontVariation
+import androidx.compose.ui.text.font.FontWeight
 import me.kavishdevar.librepods.R
 
-private fun robotoFlex(
-    wght: Float = 400f,
-    slnt: Float = 0f,
-    grad: Float = 0f,
-    wdth: Float = 100f,
-    xtra: Float = 468f,
-    xopq: Float = 96f,
-    yopq: Float = 79f,
-) = FontFamily(
-    Font(
-        resId = R.font.roboto_flex,
-        variationSettings = FontVariation.Settings(
-            FontVariation.Setting("wght", wght),
-            FontVariation.Setting("wdth", wdth),
-            FontVariation.Setting("slnt", slnt),
-            FontVariation.Setting("grad", grad),
-            FontVariation.Setting("xtra", xtra),
-            FontVariation.Setting("xopq", xopq),
-            FontVariation.Setting("yopq", yopq),
+/**
+ * Roboto Flex with one [Font] per weight, so the weight of every M3 type style (and of any
+ * `fontWeight` override) maps onto the variable `wght` axis instead of being synthesized.
+ */
+private fun robotoFlexFamily(width: Float, grade: Int) = FontFamily(
+    (100..1000 step 100).map { weight ->
+        Font(
+            resId = R.font.roboto_flex,
+            weight = FontWeight(weight),
+            variationSettings = FontVariation.Settings(
+                FontVariation.weight(weight),
+                FontVariation.width(width),
+                FontVariation.grade(grade),
+            )
         )
-    )
+    }
 )
 
-val display = robotoFlex(
-    wght = 800f,
-    grad = 100f,
-    wdth = 100f
+// Regular styles: plain Roboto Flex, i.e. the M3 baseline type scale.
+private val regular = robotoFlexFamily(width = 100f, grade = 0)
+
+// Emphasized styles: a bit heavier and slightly wider, for the few places that should stand
+// out (M3 Expressive uses emphasis sparingly, it is not meant for every list item).
+private val emphasized = robotoFlexFamily(width = 106f, grade = 0)
+
+private fun TextStyle.regular() = copy(fontFamily = regular)
+
+private fun TextStyle.emphasized(extraWeight: Int = 0) = copy(
+    fontFamily = emphasized,
+    fontWeight = FontWeight(((fontWeight ?: FontWeight.Normal).weight + extraWeight).coerceAtMost(1000)),
 )
-
-val displayEmphasized = robotoFlex(
-    wght = 1000f,
-    slnt = -2f,
-    grad = 150f,
-    wdth = 150f,
-)
-
-val body = robotoFlex()
-
-val bodyEmphasized = robotoFlex(
-    wght = 600f,
-    wdth = 130f,
-    grad = 75f,
-)
-
-val label = robotoFlex(
-    wght = 450f,
-    grad = 50f
-)
-
-val labelEmphasized = robotoFlex(
-    wght = 600f,
-    wdth = 140f,
-    grad = 75f
-)
-
 
 val RobotoFlexExpressiveTypography = Typography().run {
     copy(
-        titleSmall = titleSmall.copy(fontFamily = display),
-        titleMedium = titleMedium.copy(fontFamily = display),
-        titleLarge = titleLarge.copy(fontFamily = display),
+        displayLarge = displayLarge.regular(),
+        displayMedium = displayMedium.regular(),
+        displaySmall = displaySmall.regular(),
 
-        titleSmallEmphasized = titleSmallEmphasized.copy(fontFamily = displayEmphasized),
-        titleMediumEmphasized = titleMediumEmphasized.copy(fontFamily = displayEmphasized),
-        titleLargeEmphasized = titleLargeEmphasized.copy(fontFamily = displayEmphasized),
+        headlineLarge = headlineLarge.regular(),
+        headlineMedium = headlineMedium.regular(),
+        headlineSmall = headlineSmall.regular(),
 
-        displaySmall = displaySmall.copy(fontFamily = display),
-        displayMedium = displayMedium.copy(fontFamily = display),
-        displayLarge = displayLarge.copy(fontFamily = display),
+        titleLarge = titleLarge.regular(),
+        titleMedium = titleMedium.regular(),
+        titleSmall = titleSmall.regular(),
 
-        displaySmallEmphasized = displaySmallEmphasized.copy(fontFamily = displayEmphasized),
-        displayMediumEmphasized = displayMediumEmphasized.copy(fontFamily = displayEmphasized),
-        displayLargeEmphasized = displayLargeEmphasized.copy(fontFamily = displayEmphasized),
+        bodyLarge = bodyLarge.regular(),
+        bodyMedium = bodyMedium.regular(),
+        bodySmall = bodySmall.regular(),
 
-        bodySmall = bodySmall.copy(fontFamily = body),
-        bodyMedium = bodyMedium.copy(fontFamily = body),
-        bodyLarge = bodyLarge.copy(fontFamily = body),
+        labelLarge = labelLarge.regular(),
+        labelMedium = labelMedium.regular(),
+        labelSmall = labelSmall.regular(),
 
-        bodySmallEmphasized = bodySmallEmphasized.copy(fontFamily = bodyEmphasized),
-        bodyMediumEmphasized = bodyMediumEmphasized.copy(fontFamily = bodyEmphasized),
-        bodyLargeEmphasized = bodyLargeEmphasized.copy(fontFamily = bodyEmphasized),
+        // big expressive headlines get some extra weight, smaller text stays readable
+        displayLargeEmphasized = displayLargeEmphasized.emphasized(extraWeight = 200),
+        displayMediumEmphasized = displayMediumEmphasized.emphasized(extraWeight = 200),
+        displaySmallEmphasized = displaySmallEmphasized.emphasized(extraWeight = 200),
 
-        labelSmall = labelSmall.copy(fontFamily = label),
-        labelMedium = labelMedium.copy(fontFamily = label),
-        labelLarge = labelLarge.copy(fontFamily = label),
+        headlineLargeEmphasized = headlineLargeEmphasized.emphasized(extraWeight = 100),
+        headlineMediumEmphasized = headlineMediumEmphasized.emphasized(extraWeight = 100),
+        headlineSmallEmphasized = headlineSmallEmphasized.emphasized(extraWeight = 100),
 
-        labelSmallEmphasized = labelSmallEmphasized.copy(fontFamily = labelEmphasized),
-        labelMediumEmphasized = labelMediumEmphasized.copy(fontFamily = labelEmphasized),
-        labelLargeEmphasized = labelLargeEmphasized.copy(fontFamily = labelEmphasized)
+        titleLargeEmphasized = titleLargeEmphasized.emphasized(extraWeight = 100),
+        titleMediumEmphasized = titleMediumEmphasized.emphasized(),
+        titleSmallEmphasized = titleSmallEmphasized.emphasized(),
+
+        bodyLargeEmphasized = bodyLargeEmphasized.emphasized(),
+        bodyMediumEmphasized = bodyMediumEmphasized.emphasized(),
+        bodySmallEmphasized = bodySmallEmphasized.emphasized(),
+
+        labelLargeEmphasized = labelLargeEmphasized.emphasized(),
+        labelMediumEmphasized = labelMediumEmphasized.emphasized(),
+        labelSmallEmphasized = labelSmallEmphasized.emphasized(),
     )
 }

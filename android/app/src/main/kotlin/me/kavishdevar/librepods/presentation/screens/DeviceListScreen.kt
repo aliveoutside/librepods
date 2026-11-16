@@ -450,7 +450,6 @@ fun DeviceListScreen(
                                 ConnectionState.CONNECTING -> {
                                     Text(
                                         text = stringResource(R.string.connecting),
-                                        style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                 }
@@ -480,13 +479,10 @@ fun DeviceListScreen(
                                                     Text(
                                                         text = batteryRichText.text,
                                                         inlineContent = batteryRichText.inlineContent,
-                                                        style = MaterialTheme.typography.bodyMedium,
-                                                        color = MaterialTheme.colorScheme.onSurfaceVariant
                                                     )
                                                 } else {
                                                     Text(
                                                         text = stringResource(R.string.not_connected),
-                                                        style = MaterialTheme.typography.bodySmall,
                                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                                     )
                                                 }
