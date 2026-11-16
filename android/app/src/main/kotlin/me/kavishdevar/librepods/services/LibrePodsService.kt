@@ -817,13 +817,15 @@ class LibrePodsService: Service() {
                         when (state.conversationAwarenessState) {
                             1, 3 -> {
                                 MediaController.duckVolume(
-                                    deviceSettings.conversationAwarenessVolume.toInt()
+                                    deviceSettings.conversationAwarenessVolume.toInt(),
+                                    deviceSettings.relativeConversationAwarenessVolumeEnabled
                                 )
                             }
 
                             2 -> {
                                 MediaController.duckVolume(
-                                    deviceSettings.conversationAwarenessReducedVolume.toInt()
+                                    deviceSettings.conversationAwarenessReducedVolume.toInt(),
+                                    deviceSettings.relativeConversationAwarenessVolumeEnabled
                                 )
                             }
 

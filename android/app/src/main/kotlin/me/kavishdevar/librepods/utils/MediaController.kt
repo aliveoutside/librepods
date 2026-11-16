@@ -352,20 +352,22 @@ object MediaController {
 
     /**
      * Lowers the media volume while the user is speaking. The volume from before the first
-     * duck is remembered so [stopSpeaking] can restore it. Never raises the volume: if it is
-     * already below the requested level, it is left alone.
+     * duck is remembered so [stopSpeaking] can restore it.
+     *
+     * With [relative] the target is [volumePercent] of the volume the user had before speaking,
+     * otherwise it is [volumePercent] of the maximum volume. Either way the volume is never raised.
      */
     @Synchronized
-    fun duckVolume(volumePercent: Int) {
+    fun duckVolume(volumePercent: Int, relative: Boolean) {
         val current = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
         val original = initialVolume ?: current.also { initialVolume = it }
 
-        val maxVolume = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
-        val targetVolume = (maxVolume * volumePercent / 100).coerceIn(0, original)
+        val base = if (relative) original else audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+        val targetVolume = (base * volumePercent / 100).coerceIn(0, original)
 
         Log.d(
             "MediaController",
-            "Ducking volume, original: $original, current: $current, target: $targetVolume",
+            "Ducking volume, original: $original, current: $current, target: $targetVolume, relative: $relative",
         )
         smoothVolumeTransition(targetVolume)
     }
