@@ -96,8 +96,10 @@ class MainActivity: ComponentActivity() {
                 WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = !darkTheme
             }
 
-            LaunchedEffect(settings.swipeAnywhereForBack) {
-                if (settings.useHighestRefreshRate) {
+            LaunchedEffect(settings.useHighestRefreshRate) {
+                if (!settings.useHighestRefreshRate) {
+                    window.attributes = window.attributes.apply { preferredRefreshRate = 0f }
+                } else {
                     val display = getSystemService(DisplayManager::class.java)
                         .getDisplay(Display.DEFAULT_DISPLAY)
 

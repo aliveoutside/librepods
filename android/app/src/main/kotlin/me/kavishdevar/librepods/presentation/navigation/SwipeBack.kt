@@ -1,8 +1,10 @@
 package me.kavishdevar.librepods.presentation.navigation
 
 import androidx.activity.compose.PredictiveBackHandler
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animate
+import androidx.compose.animation.core.spring
+import androidx.compose.foundation.MutatorMutex
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
@@ -13,6 +15,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -26,10 +29,9 @@ import androidx.navigation3.scene.SceneStrategy
 import androidx.navigation3.scene.SceneStrategyScope
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import kotlin.coroutines.cancellation.CancellationException
-
-// mostly AI generated
 
 private enum class Direction {
     Forward,
@@ -37,13 +39,21 @@ private enum class Direction {
     None
 }
 
+// Critically damped, so it never overshoots, and it carries the fling velocity over.
+private val SwipeSpec = spring(
+    dampingRatio = Spring.DampingRatioNoBouncy,
+    stiffness = Spring.StiffnessMediumLow,
+    visibilityThreshold = 0.5f,
+)
+
 class SwipeBackSceneStrategy<T : Any>(
     private val enabled: Boolean,
     private val backRequests: Channel<CompletableDeferred<Unit>>,
     private val onDismiss: () -> Unit
 ) : SceneStrategy<T> {
 
-    private var previousEntries: List<NavEntry<T>> = emptyList()
+    private var lastKeys: List<Any> = emptyList()
+    private var lastDirection = Direction.None
 
     override fun SceneStrategyScope<T>.calculateScene(
         entries: List<NavEntry<T>>
@@ -53,13 +63,19 @@ class SwipeBackSceneStrategy<T : Any>(
         val currentEntry = entries.last()
         val previousEntry = entries.getOrNull(entries.lastIndex - 1)
 
-        val direction = when {
-            previousEntries.isEmpty() -> Direction.None
-            currentEntry in previousEntries -> Direction.Back
-            else -> Direction.Forward
+        // The scene can be recalculated for the same back stack (any recomposition of
+        // NavDisplay). Only a real back stack change may change the direction, otherwise a
+        // running push animation is restarted as a "back" one and the page gets stuck midway.
+        val keys = entries.map { it.contentKey }
+        if (keys != lastKeys) {
+            lastDirection = when {
+                lastKeys.isEmpty() -> Direction.None
+                currentEntry.contentKey in lastKeys -> Direction.Back
+                else -> Direction.Forward
+            }
+            lastKeys = keys
         }
-
-        previousEntries = entries
+        val direction = lastDirection
 
         return object : Scene<T> {
             override val key: Any
@@ -100,99 +116,76 @@ private fun <T : Any> SwipeBackSceneContent(
         LocalWindowInfo.current.containerDpSize.width.toPx()
     }
 
-    val animatedOffset = remember(
-        "${currentEntry.contentKey}_${currentEntry.hashCode()}"
-    ) {
-        Animatable(
-            if (direction == Direction.Forward) {
-                screenWidthPx
-            } else {
-                0f
-            }
-        )
+    val sceneKey = "${currentEntry.contentKey}_${currentEntry.hashCode()}"
+
+    // Horizontal offset of the current entry, 0 = fully shown, screenWidthPx = fully hidden.
+    var offset by remember(sceneKey) {
+        mutableFloatStateOf(if (direction == Direction.Forward) screenWidthPx else 0f)
     }
+    // false while the page is being pushed, true once it can only go away (swipe/back).
+    var closing by remember(sceneKey) { mutableStateOf(direction != Direction.Forward) }
 
-    var transitionProgress by remember {
-        mutableFloatStateOf(
-            if (direction == Direction.Forward) 1f else 0f
-        )
-    }
-
-    val scope = rememberCoroutineScope()
-
-    LaunchedEffect(
-        "${currentEntry.contentKey}_${currentEntry.hashCode()}",
-        direction
-    ) {
-        if (direction == Direction.Forward) {
-            animatedOffset.animateTo(
-                0f,
-                tween(220)
-            ) {
-                transitionProgress = (value / screenWidthPx).coerceIn(0f, 1f)
-            }
-            transitionProgress = 0f
+    // Positive while pushing, negative while going back, 0 when idle. Read lazily so that
+    // the screens are not recomposed on every animation frame.
+    val transitionProgress = remember(sceneKey, screenWidthPx) {
+        {
+            val progress = (offset / screenWidthPx).coerceIn(0f, 1f)
+            if (closing) -progress else progress
         }
     }
 
-    LaunchedEffect(Unit) {
+    // Only one animation or gesture drives the offset at a time; a new one cancels the old.
+    val mutex = remember(sceneKey) { MutatorMutex() }
+    val scope = rememberCoroutineScope()
+
+    suspend fun animateOffsetTo(target: Float, velocity: Float = 0f) {
+        mutex.mutate {
+            animate(offset, target, velocity, SwipeSpec) { value, _ -> offset = value }
+        }
+    }
+
+    suspend fun dismiss(velocity: Float = 0f) {
+        closing = true
+        animateOffsetTo(screenWidthPx, velocity)
+        onDismiss()
+    }
+
+    LaunchedEffect(sceneKey) {
+        if (direction == Direction.Forward) {
+            animateOffsetTo(0f)
+        }
+        closing = true
+    }
+
+    LaunchedEffect(sceneKey) {
         for (completed in backRequests) {
-            animatedOffset.animateTo(
-                screenWidthPx,
-                tween(150)
-            ) {
-                transitionProgress = -(value / screenWidthPx).coerceIn(0f, 1f)
+            try {
+                dismiss()
+            } catch (e: CancellationException) {
+                // interrupted by a swipe, keep listening unless the scene itself is gone
+                ensureActive()
+            } finally {
+                completed.complete(Unit)
             }
-            transitionProgress = -1f
-            onDismiss()
-            completed.complete(Unit)
         }
     }
 
     PredictiveBackHandler(enabled = previousEntry != null) { progressFlow ->
+        closing = true
         try {
-            progressFlow.collect { backEvent ->
-                if (previousEntry == null) return@collect
-                val progress = backEvent.progress
-
-                transitionProgress = -progress
-
-                animatedOffset.snapTo(
-                    progress * screenWidthPx
-                )
+            mutex.mutate {
+                progressFlow.collect { backEvent ->
+                    offset = backEvent.progress * screenWidthPx
+                }
             }
-
-            animatedOffset.animateTo(
-                screenWidthPx,
-                tween(150)
-            ) {
-                transitionProgress = -(value / screenWidthPx).coerceIn(0f, 1f)
-            }
-            transitionProgress = -1f
-            onDismiss()
+            dismiss()
         } catch (_: CancellationException) {
-            animatedOffset.animateTo(
-                0f,
-                tween(150)
-            ) {
-                transitionProgress = -(value / screenWidthPx).coerceIn(0f, 1f)
-            }
-            transitionProgress = 0f
+            scope.launch { animateOffsetTo(0f) }
         }
     }
 
     val draggableState = rememberDraggableState { delta ->
-        scope.launch {
-            val offset =
-                (animatedOffset.value + delta)
-                    .coerceAtLeast(0f)
-
-            animatedOffset.snapTo(offset)
-
-            transitionProgress =
-                -(offset / screenWidthPx)
-                    .coerceIn(0f, 1f)
-        }
+        offset = (offset + delta).coerceIn(0f, screenWidthPx)
     }
 
     CompositionLocalProvider(
@@ -206,7 +199,7 @@ private fun <T : Any> SwipeBackSceneContent(
                     Modifier
                         .fillMaxSize()
                         .graphicsLayer {
-                            val progress = (animatedOffset.value / screenWidthPx).coerceIn(0f, 1f)
+                            val progress = (offset / screenWidthPx).coerceIn(0f, 1f)
                             translationX = -(screenWidthPx / 3f) * (1f - progress)
                         }
                 ) {
@@ -221,36 +214,26 @@ private fun <T : Any> SwipeBackSceneContent(
                     Modifier
                         .fillMaxSize()
                         .graphicsLayer {
-                            translationX = animatedOffset.value
+                            translationX = offset
                         }
                         .draggable(
                             enabled = swipeEnabled && previousEntry != null,
                             state = draggableState,
                             orientation = Orientation.Horizontal,
+                            onDragStarted = {
+                                closing = true
+                                // stop whatever animation is running and take over
+                                mutex.mutate { }
+                            },
                             onDragStopped = { velocity ->
-                                val currentOffset = animatedOffset.value
-                                val shouldDismiss = currentOffset > screenWidthPx * 0.35f || velocity > 1000f
+                                val shouldDismiss = velocity > 1000f ||
+                                    (offset > screenWidthPx * 0.35f && velocity > -300f)
 
                                 scope.launch {
                                     if (shouldDismiss) {
-                                        animatedOffset.animateTo(
-                                            targetValue = screenWidthPx,
-                                            animationSpec = tween(150),
-                                            initialVelocity = velocity
-                                        ) {
-                                            transitionProgress = -(value / screenWidthPx).coerceIn(0f, 1f)
-                                        }
-                                        transitionProgress = -1f
-                                        onDismiss()
+                                        dismiss(velocity)
                                     } else {
-                                        animatedOffset.animateTo(
-                                            targetValue = 0f,
-                                            animationSpec = tween(150),
-                                            initialVelocity = velocity
-                                        ) {
-                                            transitionProgress = -(value / screenWidthPx).coerceIn(0f, 1f)
-                                        }
-                                        transitionProgress = 0f
+                                        animateOffsetTo(0f, velocity)
                                     }
                                 }
                             }

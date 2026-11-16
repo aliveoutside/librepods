@@ -64,6 +64,8 @@ import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 import dev.chrisbanes.haze.HazeInput
 import me.kavishdevar.librepods.BuildConfig
 import me.kavishdevar.librepods.R
+import me.kavishdevar.librepods.data.app.DesignSystem
+import me.kavishdevar.librepods.presentation.design.LocalDesign
 import me.kavishdevar.librepods.presentation.components.common.AppInfoCard
 import me.kavishdevar.librepods.presentation.components.common.DeviceInfoCard
 import me.kavishdevar.librepods.presentation.components.primitives.StyledBottomSheet
@@ -179,16 +181,21 @@ fun AppSettingsScreen(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
+                // swipe anywhere only exists with the Apple-style stacked navigation
+                val swipeBackAvailable = LocalDesign.current.system == DesignSystem.Apple
+
                 StyledList(title = stringResource(R.string.interaction)) {
-                    styledToggle(
-                        label = stringResource(R.string.swipe_anywhere_to_go_back),
-                        checked = state.settings.swipeAnywhereForBack,
-                        onCheckedChange = { checked ->
-                            viewModel.updateSettings {
-                                it.copy(swipeAnywhereForBack = checked)
-                            }
-                        },
-                    )
+                    if (swipeBackAvailable) {
+                        styledToggle(
+                            label = stringResource(R.string.swipe_anywhere_to_go_back),
+                            checked = state.settings.swipeAnywhereForBack,
+                            onCheckedChange = { checked ->
+                                viewModel.updateSettings {
+                                    it.copy(swipeAnywhereForBack = checked)
+                                }
+                            },
+                        )
+                    }
 
                     styledToggle(
                         label = stringResource(R.string.use_highest_refresh_rate),

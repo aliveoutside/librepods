@@ -63,6 +63,8 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -128,24 +130,11 @@ fun StyledScaffold(
 
     when (design.system) {
         DesignSystem.Material -> {
+            // Material pages use Material navigation transitions (see AppNavGraph), they are
+            // not stacked like cards, so no shadow or screen-corner clipping is needed here.
             Scaffold(
                 containerColor = if (design.colorStyle == ColorStyle.Custom) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.surfaceContainer,
                 snackbarHost = { SnackbarHost(snackbarHostState) },
-                modifier = Modifier
-                    .then(
-                        if (MaterialTheme.colorScheme.surface.luminance() > 0.5) Modifier.shadow(
-                            elevation = 36.dp,
-                            shape = screenCutoutShape,
-                            ambientColor = Color.Black,
-                            spotColor = Color.Black
-                        ) else Modifier.shadow(
-                            elevation = 36.dp,
-                            shape = screenCutoutShape,
-                            ambientColor = Color.Gray,
-                            spotColor = Color.Gray
-                        )
-                    )
-                    .clip(screenCutoutShape),
                 topBar = {
                     AnimatedVisibility(
                         visible = visible,
@@ -214,7 +203,6 @@ fun StyledScaffold(
                         )
                         .fillMaxSize()
                         .hazeSource(hazeState)
-                        .clip(screenCutoutShape)
                 ) {
                     content(paddingValues.calculateTopPadding(), paddingValues.calculateBottomPadding())
                 }
@@ -260,7 +248,10 @@ fun StyledScaffold(
                     val transitionProgress = LocalTransitionProgress.current
                     var sharedTransitionScope = LocalSharedTransitionScope.current
 
-                    val showBackButton = if (transitionProgress == 0f) navigateBack != null else !isCurrentEntry
+                    val transitionIdle by remember(transitionProgress) {
+                        derivedStateOf { transitionProgress() == 0f }
+                    }
+                    val showBackButton = if (transitionIdle) navigateBack != null else !isCurrentEntry
 
                     @SuppressLint("UnusedSharedTransitionModifierParameter")
                     if (sharedTransitionScope == null) {
@@ -278,7 +269,7 @@ fun StyledScaffold(
                                 .fillMaxSize()
                                 .renderInSharedTransitionScopeOverlay(
                                     zIndexInOverlay = 1f,
-                                    renderInOverlay = { transitionProgress != 0f }
+                                    renderInOverlay = { transitionProgress() != 0f }
                                 )
                                 .hazeSource(hazeState)
                         )
@@ -309,12 +300,13 @@ fun StyledScaffold(
                                     .renderInSharedTransitionScopeOverlay(
                                         zIndexInOverlay = 3f,
                                         renderInOverlay = {
-                                            !isCurrentEntry && transitionProgress != 0f
+                                            !isCurrentEntry && transitionProgress() != 0f
                                         }
                                     )
                                     .graphicsLayer { // AI generated
-                                        if (!isCurrentEntry && transitionProgress < 0f) {
-                                            val progress = (-transitionProgress).coerceIn(0f, 1f)
+                                        val currentProgress = transitionProgress()
+                                        if (!isCurrentEntry && currentProgress < 0f) {
+                                            val progress = (-currentProgress).coerceIn(0f, 1f)
 
                                             translationX = (screenWidthPx / 3f) * (1f - progress)
 
