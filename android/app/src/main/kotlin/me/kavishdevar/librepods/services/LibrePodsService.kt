@@ -609,6 +609,29 @@ class LibrePodsService: Service() {
         }
     }
 
+    /**
+     * AirPods report conversation awareness as a level: 1/2 = started speaking, 3 = stopped
+     * speaking, then intermediate levels while they ramp the volume back up, 8/9 = normal.
+     */
+    private fun handleConversationAwareness(level: Int, deviceSettings: AppleSettings) {
+        if (deviceSettings.conversationAwarenessPauseMusicEnabled) {
+            // While music is paused there is no volume to ramp back, so the AirPods may stop
+            // at 3 ("stopped speaking"); resume on that instead of waiting for 8/9.
+            when (level) {
+                1, 2 -> MediaController.pauseForConversation()
+                in 3..9 -> MediaController.stopSpeaking()
+            }
+            return
+        }
+
+        val relativeVolume = deviceSettings.relativeConversationAwarenessVolumeEnabled
+        when (level) {
+            1, 3 -> MediaController.duckVolume(deviceSettings.conversationAwarenessVolume.toInt(), relativeVolume)
+            2 -> MediaController.duckVolume(deviceSettings.conversationAwarenessReducedVolume.toInt(), relativeVolume)
+            6, 7, 8, 9 -> MediaController.stopSpeaking()
+        }
+    }
+
     fun observeAppleState(device: AppleDevice) {
         serviceCoroutineScope.launch {
             var previousState = device.state.value
@@ -623,6 +646,17 @@ class LibrePodsService: Service() {
                     if (appDataRepository.state.value.firstSuccessfulConnectionTime == null) {
                         appDataRepository.updateState { it.copy(firstSuccessfulConnectionTime = System.currentTimeMillis()) }
                     }
+                }
+
+                // Not part of the `when` below: only its first matching branch runs, so a
+                // conversation awareness change arriving together with any other change
+                // (battery, ear detection...) would be dropped.
+                if (state.conversationAwarenessState != previousState.conversationAwarenessState) {
+                    Log.d(
+                        TAG,
+                        "conversation awareness state for device ${device.macAddress.toRedactedString()}: ${state.conversationAwarenessState}"
+                    )
+                    handleConversationAwareness(state.conversationAwarenessState, deviceSettings)
                 }
 
                 when {
@@ -802,39 +836,6 @@ class LibrePodsService: Service() {
 
                         Log.d(TAG, "updating notification")
                         updateDeviceNotification(device = device)
-                    }
-
-                    state.conversationAwarenessState != previousState.conversationAwarenessState -> {
-                        Log.i(
-                            TAG,
-                            "conversation awareness state changed for device ${device.macAddress.toRedactedString()}"
-                        )
-                        Log.d(
-                            TAG,
-                            "conversation awareness state: ${state.conversationAwarenessState}"
-                        )
-
-                        val pauseInsteadOfDucking = deviceSettings.conversationAwarenessPauseMusicEnabled
-                        val relativeVolume = deviceSettings.relativeConversationAwarenessVolumeEnabled
-
-                        when (state.conversationAwarenessState) {
-                            1, 2, 3 -> {
-                                if (pauseInsteadOfDucking) {
-                                    MediaController.pauseForConversation()
-                                } else {
-                                    val volume = if (state.conversationAwarenessState == 2) {
-                                        deviceSettings.conversationAwarenessReducedVolume
-                                    } else {
-                                        deviceSettings.conversationAwarenessVolume
-                                    }
-                                    MediaController.duckVolume(volume.toInt(), relativeVolume)
-                                }
-                            }
-
-                            6, 7, 8, 9 -> {
-                                MediaController.stopSpeaking()
-                            }
-                        }
                     }
 
                     state.currentHeartRate?.timestamp != previousState.currentHeartRate?.timestamp -> {
