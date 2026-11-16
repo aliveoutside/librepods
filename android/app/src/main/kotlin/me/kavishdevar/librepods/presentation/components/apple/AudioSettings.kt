@@ -41,6 +41,9 @@ fun AudioSettings(
     conversationAwarenessChecked: Boolean,
     onConversationAwarenessCheckedChange: (Boolean) -> Unit,
 
+    conversationAwarenessPauseMusicChecked: Boolean,
+    onConversationAwarenessPauseMusicCheckedChange: (Boolean) -> Unit,
+
     loudSoundReductionChecked: Boolean,
     onLoudSoundReductionCheckedChange: (Boolean) -> Unit,
 
@@ -68,6 +71,14 @@ fun AudioSettings(
                     checked = conversationAwarenessChecked,
                     onCheckedChange = onConversationAwarenessCheckedChange,
                     enabled = isPremium,
+                )
+
+                styledToggle(
+                    label = stringResource(R.string.conversation_awareness_pause_music),
+                    description = stringResource(R.string.conversation_awareness_pause_music_description),
+                    checked = conversationAwarenessPauseMusicChecked,
+                    onCheckedChange = onConversationAwarenessPauseMusicCheckedChange,
+                    enabled = isPremium && conversationAwarenessChecked,
                 )
             }
 

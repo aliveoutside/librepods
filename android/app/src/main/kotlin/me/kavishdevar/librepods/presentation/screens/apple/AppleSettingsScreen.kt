@@ -476,6 +476,10 @@ fun AppleSettingsScreen(
                             checked
                         )
                     },
+                    conversationAwarenessPauseMusicChecked = settings.conversationAwarenessPauseMusicEnabled,
+                    onConversationAwarenessPauseMusicCheckedChange = { checked ->
+                        updateSettings { it.copy(conversationAwarenessPauseMusicEnabled = checked) }
+                    },
                     loudSoundReductionChecked = state.loudSoundReductionEnabled,
                     onLoudSoundReductionCheckedChange = { checked ->
                         writeATTCharacteristic(

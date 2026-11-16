@@ -363,7 +363,8 @@ object MediaController {
         val original = initialVolume ?: current.also { initialVolume = it }
 
         val base = if (relative) original else audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
-        val targetVolume = (base * volumePercent / 100).coerceIn(0, original)
+        // Keep at least one step so the music doesn't go silent at low volumes.
+        val targetVolume = (base * volumePercent / 100).coerceIn(minOf(1, original), original)
 
         Log.d(
             "MediaController",
@@ -372,8 +373,25 @@ object MediaController {
         smoothVolumeTransition(targetVolume)
     }
 
+    private var pausedForConversation = false
+
+    /** Pauses playback while the user is speaking; [stopSpeaking] resumes it. */
+    @Synchronized
+    fun pauseForConversation() {
+        if (pausedForConversation || !audioManager.isMusicActive) return
+        Log.d("MediaController", "Pausing media for conversation")
+        pausedForConversation = true
+        sendPause(force = true)
+    }
+
     @Synchronized
     fun stopSpeaking() {
+        if (pausedForConversation) {
+            pausedForConversation = false
+            Log.d("MediaController", "Resuming media after conversation")
+            sendPlay(force = true)
+        }
+
         val original = initialVolume ?: return
         initialVolume = null
 

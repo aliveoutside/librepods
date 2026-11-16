@@ -814,19 +814,21 @@ class LibrePodsService: Service() {
                             "conversation awareness state: ${state.conversationAwarenessState}"
                         )
 
-                        when (state.conversationAwarenessState) {
-                            1, 3 -> {
-                                MediaController.duckVolume(
-                                    deviceSettings.conversationAwarenessVolume.toInt(),
-                                    deviceSettings.relativeConversationAwarenessVolumeEnabled
-                                )
-                            }
+                        val pauseInsteadOfDucking = deviceSettings.conversationAwarenessPauseMusicEnabled
+                        val relativeVolume = deviceSettings.relativeConversationAwarenessVolumeEnabled
 
-                            2 -> {
-                                MediaController.duckVolume(
-                                    deviceSettings.conversationAwarenessReducedVolume.toInt(),
-                                    deviceSettings.relativeConversationAwarenessVolumeEnabled
-                                )
+                        when (state.conversationAwarenessState) {
+                            1, 2, 3 -> {
+                                if (pauseInsteadOfDucking) {
+                                    MediaController.pauseForConversation()
+                                } else {
+                                    val volume = if (state.conversationAwarenessState == 2) {
+                                        deviceSettings.conversationAwarenessReducedVolume
+                                    } else {
+                                        deviceSettings.conversationAwarenessVolume
+                                    }
+                                    MediaController.duckVolume(volume.toInt(), relativeVolume)
+                                }
                             }
 
                             6, 7, 8, 9 -> {
