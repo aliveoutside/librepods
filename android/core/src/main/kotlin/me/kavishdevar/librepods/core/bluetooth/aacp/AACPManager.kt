@@ -115,6 +115,11 @@ class AACPManager(private val device: AppleDevice) {
                 socket.connect()
             } catch (e: Exception) {
                 Log.e(TAG, "failed to connect", e)
+                try {
+                    socket.close()
+                } catch (_: Exception) {
+                }
+                this.socket = null
                 return false
             }
 
@@ -131,27 +136,38 @@ class AACPManager(private val device: AppleDevice) {
             CoroutineScope(Dispatchers.IO).launch {
                 Log.i(TAG, "starting to read data...")
 
+                // isConnected stays true after the link drops until the socket is closed, so the
+                // loop has to end on EOF or a read error itself; otherwise it spins forever and
+                // connect() keeps treating the dead socket as connected.
+                val buffer = ByteArray(1024)
                 while (socket.isConnected) {
-                    try {
-                        val buffer = ByteArray(1024)
-                        val bytesRead = socket.inputStream.read(buffer)
-                        var data: ByteArray
-                        if (bytesRead > 0) {
-                            data = buffer.copyOfRange(0, bytesRead)
-                            try {
-                                processPacket(data)
-                            } catch (e: Exception) {
-                                Log.e(TAG, "Error processing received packet: ${e.message}")
-                                e.printStackTrace()
-                            }
-
-                        } else if (bytesRead == -1) {
-                            Log.i("AirPodsService", "socket closed (bytesRead = -1)")
-                        }
+                    val bytesRead = try {
+                        socket.inputStream.read(buffer)
                     } catch (e: Exception) {
-                        Log.i(TAG, "Error reading data, we have probably disconnected.")
+                        Log.i(TAG, "Error reading data, we have probably disconnected: ${e.message}")
+                        break
+                    }
+                    if (bytesRead == -1) {
+                        Log.i(TAG, "socket closed (bytesRead = -1)")
+                        break
+                    }
+                    if (bytesRead == 0) continue
+
+                    try {
+                        processPacket(buffer.copyOfRange(0, bytesRead))
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Error processing received packet: ${e.message}")
                         e.printStackTrace()
                     }
+                }
+
+                if (this@AACPManager.socket === socket) {
+                    try {
+                        socket.close()
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Error closing socket", e)
+                    }
+                    this@AACPManager.socket = null
                 }
             }
         } ?: run {
