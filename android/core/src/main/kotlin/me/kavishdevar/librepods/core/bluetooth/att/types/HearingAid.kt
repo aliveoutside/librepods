@@ -141,7 +141,9 @@ fun sendHearingAidSettings(
             Log.w(TAG, "Current data size ${currentData.size} too small, cannot send settings")
             return
         }
-        val buffer = ByteBuffer.wrap(currentData).order(ByteOrder.LITTLE_ENDIAN)
+        // work on a copy: currentData is the device state's array and must not change under it
+        val data = currentData.copyOf()
+        val buffer = ByteBuffer.wrap(data).order(ByteOrder.LITTLE_ENDIAN)
 
         // for some reason
         buffer.put(2, 0x64)
@@ -171,9 +173,9 @@ fun sendHearingAidSettings(
         // Own voice amplification
         buffer.putFloat(100, hearingAidSettings.ownVoiceAmplification)
 
-        Log.d(TAG, "Sending updated settings: ${currentData.joinToString(" ") { String.format("%02X", it) }}")
+        Log.d(TAG, "Sending updated settings: ${data.joinToString(" ") { String.format("%02X", it) }}")
 
-        sender(ATTHandle.HEARING_AID, currentData)
+        sender(ATTHandle.HEARING_AID, data)
     } catch (e: IOException) {
         e.printStackTrace()
     }

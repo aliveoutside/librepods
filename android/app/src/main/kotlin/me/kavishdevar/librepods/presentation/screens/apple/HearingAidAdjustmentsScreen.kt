@@ -18,6 +18,7 @@
 
 package me.kavishdevar.librepods.presentation.screens.apple
 
+import android.os.SystemClock
 import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -35,15 +36,19 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import me.kavishdevar.librepods.R
 import me.kavishdevar.librepods.core.bluetooth.aacp.types.ControlCommandIdentifier
 import me.kavishdevar.librepods.core.bluetooth.att.ATTHandle
@@ -59,6 +64,9 @@ import kotlin.time.Duration.Companion.milliseconds
 
 private const val TAG = "HearingAidAdjustments"
 
+// how long device updates are ignored after a local change, covering the debounce and the write
+private const val LOCAL_CHANGE_GRACE_MS = 2500L
+
 @Composable
 fun HearingAidAdjustmentsScreen(
     viewModel: AppleViewModel,
@@ -69,8 +77,6 @@ fun HearingAidAdjustmentsScreen(
 
     val state = uiState.state
 
-    val debounceJob = remember { mutableStateOf<Job?>(null) }
-
     val amplificationSliderValue = rememberSaveable { mutableFloatStateOf(0.5f) }
     val balanceSliderValue = rememberSaveable { mutableFloatStateOf(0.5f) }
     val toneSliderValue = rememberSaveable { mutableFloatStateOf(0.5f) }
@@ -80,8 +86,6 @@ fun HearingAidAdjustmentsScreen(
     val rightEQ = rememberSaveable { mutableStateOf(FloatArray(8)) }
     val ownVoiceAmplification = rememberSaveable { mutableFloatStateOf(0.5f) }
 
-    val initialized = rememberSaveable { mutableStateOf(false) }
-
     DisposableEffect(Unit) {
         viewModel.observeATTCharacteristic(ATTHandle.HEARING_AID)
 
@@ -90,26 +94,20 @@ fun HearingAidAdjustmentsScreen(
         }
     }
 
-    val hearingAidSettings = remember { mutableStateOf(
-        HearingAidSettings(
-            leftEQ = leftEQ.value,
-            rightEQ = rightEQ.value,
-            leftAmplification = 0f,
-            rightAmplification = 0f,
-            leftTone = 0f,
-            rightTone = 0f,
-            leftConversationBoost = false,
-            rightConversationBoost = false,
-            leftAmbientNoiseReduction = 0f,
-            rightAmbientNoiseReduction = 0f,
-            netAmplification = 0f,
-            balance = 0f,
-            ownVoiceAmplification = 0f
-        )
-    ) }
+    // the latest data from the AirPods, the base every write is built on
+    val currentData by rememberUpdatedState(state.hearingAidData)
+    var appliedData by remember { mutableStateOf<ByteArray?>(null) }
+    var lastLocalChangeAt by remember { mutableLongStateOf(0L) }
 
+    // Show what the AirPods report. The data is polled, so this runs for every poll: skip
+    // unchanged data, and don't fight the user while they adjust or their write is on its way
+    // (a value the AirPods didn't take shows up again with the next poll after that).
     LaunchedEffect(state.hearingAidData) {
-        parseHearingAidSettingsResponse(state.hearingAidData)?.let { parsed ->
+        val data = state.hearingAidData
+        if (appliedData?.contentEquals(data) == true) return@LaunchedEffect
+        if (SystemClock.uptimeMillis() - lastLocalChangeAt < LOCAL_CHANGE_GRACE_MS) return@LaunchedEffect
+
+        parseHearingAidSettingsResponse(data)?.let { parsed ->
             amplificationSliderValue.floatValue = parsed.netAmplification
             balanceSliderValue.floatValue = parsed.balance
             toneSliderValue.floatValue = parsed.leftTone
@@ -118,57 +116,47 @@ fun HearingAidAdjustmentsScreen(
             leftEQ.value = parsed.leftEQ.copyOf()
             rightEQ.value = parsed.rightEQ.copyOf()
             ownVoiceAmplification.floatValue = parsed.ownVoiceAmplification
-            initialized.value = true
+            appliedData = data
         }
     }
 
-    LaunchedEffect(Unit) {
-        snapshotFlow {
-            listOf(
-                amplificationSliderValue.floatValue,
-                balanceSliderValue.floatValue,
-                toneSliderValue.floatValue,
-                conversationBoostEnabled.value,
-                ambientNoiseReductionSliderValue.floatValue,
-                ownVoiceAmplification.floatValue,
-                leftEQ.value,
-                rightEQ.value,
-                initialized.value
+    // Only changes made by the user are written, debounced while a slider is being dragged.
+    val scope = rememberCoroutineScope()
+    var writeJob by remember { mutableStateOf<Job?>(null) }
+    fun onUserChange() {
+        lastLocalChangeAt = SystemClock.uptimeMillis()
+        writeJob?.cancel()
+        writeJob = scope.launch {
+            delay(300.milliseconds)
+
+            val amplification = amplificationSliderValue.floatValue
+            val balance = balanceSliderValue.floatValue
+            val tone = toneSliderValue.floatValue
+            val conversationBoost = conversationBoostEnabled.value
+            val ambientNoise = ambientNoiseReductionSliderValue.floatValue
+
+            val settings = HearingAidSettings(
+                leftEQ = leftEQ.value,
+                rightEQ = rightEQ.value,
+                // inverse of parseHearingAidSettingsResponse (amplification = average,
+                // balance = right - left), so a written value reads back the same
+                leftAmplification = (amplification - balance / 2).coerceIn(-1f, 1f),
+                rightAmplification = (amplification + balance / 2).coerceIn(-1f, 1f),
+                leftTone = tone,
+                rightTone = tone,
+                leftConversationBoost = conversationBoost,
+                rightConversationBoost = conversationBoost,
+                leftAmbientNoiseReduction = ambientNoise,
+                rightAmbientNoiseReduction = ambientNoise,
+                netAmplification = amplification,
+                balance = balance,
+                ownVoiceAmplification = ownVoiceAmplification.floatValue
             )
+
+            Log.d(TAG, "Updated settings: $settings")
+            lastLocalChangeAt = SystemClock.uptimeMillis()
+            sendHearingAidSettings(currentData, settings, viewModel::writeATTCharacteristic)
         }
-            .debounce(300.milliseconds)
-            .collect { values ->
-                val isInitialized = values[8] as Boolean
-                if (!isInitialized) return@collect
-
-                val amplification = values[0] as Float
-                val balance = values[1] as Float
-                val tone = values[2] as Float
-                val conversationBoost = values[3] as Boolean
-                val ambientNoise = values[4] as Float
-                val ownVoice = values[5] as Float
-                val leftEqVal = values[6] as FloatArray
-                val rightEqVal = values[7] as FloatArray
-
-                hearingAidSettings.value = HearingAidSettings(
-                    leftEQ = leftEqVal,
-                    rightEQ = rightEqVal,
-                    leftAmplification = amplification + if (balance < 0) -balance else 0f,
-                    rightAmplification = amplification + if (balance > 0) balance else 0f,
-                    leftTone = tone,
-                    rightTone = tone,
-                    leftConversationBoost = conversationBoost,
-                    rightConversationBoost = conversationBoost,
-                    leftAmbientNoiseReduction = ambientNoise,
-                    rightAmbientNoiseReduction = ambientNoise,
-                    netAmplification = amplification,
-                    balance = balance,
-                    ownVoiceAmplification = ownVoice
-                )
-
-                Log.d(TAG, "Updated settings: ${hearingAidSettings.value}")
-                sendHearingAidSettings(state.hearingAidData, hearingAidSettings.value, viewModel::writeATTCharacteristic)
-            }
     }
 
     StyledScaffold(
@@ -189,6 +177,7 @@ fun HearingAidAdjustmentsScreen(
                 value = amplificationSliderValue.floatValue,
                 onValueChange = {
                     amplificationSliderValue.floatValue = it
+                    onUserChange()
                 },
                 startImageVector = LocalIcons.current.SpeakerMin,
                 endImageVector = LocalIcons.current.SpeakerMax,
@@ -208,6 +197,7 @@ fun HearingAidAdjustmentsScreen(
                 value = balanceSliderValue.floatValue,
                 onValueChange = {
                     balanceSliderValue.floatValue = it
+                    onUserChange()
                 },
                 snapPoints = listOf(-1f, 0f, 1f),
                 startLabel = stringResource(R.string.left),
@@ -221,6 +211,7 @@ fun HearingAidAdjustmentsScreen(
                 value = toneSliderValue.floatValue,
                 onValueChange = {
                     toneSliderValue.floatValue = it
+                    onUserChange()
                 },
                 startLabel = stringResource(R.string.darker),
                 endLabel = stringResource(R.string.brighter),
@@ -233,6 +224,7 @@ fun HearingAidAdjustmentsScreen(
                 value = ambientNoiseReductionSliderValue.floatValue,
                 onValueChange = {
                     ambientNoiseReductionSliderValue.floatValue = it
+                    onUserChange()
                 },
                 startLabel = stringResource(R.string.less),
                 endLabel = stringResource(R.string.more),
@@ -242,7 +234,10 @@ fun HearingAidAdjustmentsScreen(
             StyledToggle(
                 label = stringResource(R.string.conversation_boost),
                 checked = conversationBoostEnabled.value,
-                onCheckedChange = { conversationBoostEnabled.value = it },
+                onCheckedChange = {
+                    conversationBoostEnabled.value = it
+                    onUserChange()
+                },
                 description = stringResource(R.string.conversation_boost_description)
             )
 

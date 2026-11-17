@@ -43,6 +43,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.snapshotFlow
@@ -150,8 +151,8 @@ fun UpdateHearingTestScreen(
                         rightConversationBoost = conversationBoostEnabled.value,
                         leftAmbientNoiseReduction = ambientNoiseReduction.floatValue,
                         rightAmbientNoiseReduction = ambientNoiseReduction.floatValue,
-                        netAmplification = leftAmplification.floatValue + rightAmplification.floatValue / 2,
-                        balance = 0.5f + (rightAmplification.floatValue - leftAmplification.floatValue) / 2,
+                        netAmplification = (leftAmplification.floatValue + rightAmplification.floatValue) / 2,
+                        balance = rightAmplification.floatValue - leftAmplification.floatValue,
                         ownVoiceAmplification = ownVoiceAmplification.floatValue
                     )
                 )
@@ -175,6 +176,9 @@ fun UpdateHearingTestScreen(
                 }
             }
 
+            // the effect below lives for the whole screen; read the data fresh for every write
+            val currentHearingAidData by rememberUpdatedState(state.hearingAidData)
+
             LaunchedEffect(Unit) {
                 snapshotFlow {
                     if (!initialized.value) return@snapshotFlow null
@@ -190,8 +194,8 @@ fun UpdateHearingTestScreen(
                         rightConversationBoost = conversationBoostEnabled.value,
                         leftAmbientNoiseReduction = ambientNoiseReduction.floatValue,
                         rightAmbientNoiseReduction = ambientNoiseReduction.floatValue,
-                        netAmplification = leftAmplification.floatValue + rightAmplification.floatValue / 2f,
-                        balance = 0.5f + (rightAmplification.floatValue - leftAmplification.floatValue) / 2f,
+                        netAmplification = (leftAmplification.floatValue + rightAmplification.floatValue) / 2f,
+                        balance = rightAmplification.floatValue - leftAmplification.floatValue,
                         ownVoiceAmplification = ownVoiceAmplification.floatValue
                     )
                 }
@@ -200,7 +204,7 @@ fun UpdateHearingTestScreen(
                     .collect { settings ->
                         hearingAidSettings.value = settings
                         Log.d(TAG, "Updated settings: $settings")
-                        sendHearingAidSettings(state.hearingAidData, settings, setATTCharacteristicValue)
+                        sendHearingAidSettings(currentHearingAidData, settings, setATTCharacteristicValue)
                     }
             }
 

@@ -129,6 +129,7 @@ fun TransparencySettingsScreen(
 //        ) { mutableStateOf(FloatArray(8) { 0.5f }) }
 
             val initialized = rememberSaveable { mutableStateOf(false) }
+            val ownVoiceAmplification = remember { mutableStateOf<Float?>(null) }
 
             val transparencySettings = remember {
                 mutableStateOf(
@@ -164,8 +165,10 @@ fun TransparencySettingsScreen(
                     enabled = enabled.value,
                     leftEQ = eq.value,
                     rightEQ = eq.value,
-                    leftAmplification = amplificationSliderValue.floatValue + if (balanceSliderValue.floatValue < 0) -balanceSliderValue.floatValue else 0f,
-                    rightAmplification = amplificationSliderValue.floatValue + if (balanceSliderValue.floatValue > 0) balanceSliderValue.floatValue else 0f,
+                    // inverse of parseTransparencySettingsResponse (amplification = average,
+                    // balance = right - left), so a written value reads back the same
+                    leftAmplification = (amplificationSliderValue.floatValue - balanceSliderValue.floatValue / 2).coerceIn(-1f, 1f),
+                    rightAmplification = (amplificationSliderValue.floatValue + balanceSliderValue.floatValue / 2).coerceIn(-1f, 1f),
                     leftTone = toneSliderValue.floatValue,
                     rightTone = toneSliderValue.floatValue,
                     leftConversationBoost = conversationBoostEnabled.value,
@@ -173,7 +176,9 @@ fun TransparencySettingsScreen(
                     leftAmbientNoiseReduction = ambientNoiseReductionSliderValue.floatValue,
                     rightAmbientNoiseReduction = ambientNoiseReductionSliderValue.floatValue,
                     netAmplification = amplificationSliderValue.floatValue,
-                    balance = balanceSliderValue.floatValue
+                    balance = balanceSliderValue.floatValue,
+                    // not editable here, but must be sent back or the payload is 4 bytes short
+                    ownVoiceAmplification = ownVoiceAmplification.value
                 )
                 Log.d("TransparencySettings", "Updated settings: ${transparencySettings.value}")
                 sendTransparencySettings(viewModel::writeATTCharacteristic, transparencySettings.value)
@@ -189,6 +194,7 @@ fun TransparencySettingsScreen(
                 ambientNoiseReductionSliderValue.floatValue =
                     parsedSettings.leftAmbientNoiseReduction
                 conversationBoostEnabled.value = parsedSettings.leftConversationBoost
+                ownVoiceAmplification.value = parsedSettings.ownVoiceAmplification
                 if (!eq.value.contentEquals(parsedSettings.leftEQ)) {
                     eq.value = parsedSettings.leftEQ.copyOf()
                 }
