@@ -43,7 +43,9 @@ class AppleDevice(
     override val context: Context,
     override val bluetoothAdapter: BluetoothAdapter,
     override val bluetoothDevice: BluetoothDevice,
-    currentState: ConnectionState
+    currentState: ConnectionState,
+    /** ATT (loud sound reduction, transparency, hearing aid) needs the vendor ID hook. */
+    isAttAvailable: () -> Boolean = { true },
 ) : Device<AppleState, AppleSettings, AppleMetadata> {
     override val macAddress = MacAddress(bluetoothDevice.address)
     private val _state = MutableStateFlow(AppleState())
@@ -118,7 +120,7 @@ class AppleDevice(
     }
 
     val aacp = AACPManager(this)
-    val att = ATTManager(this)
+    val att = ATTManager(this, isAttAvailable)
 
 
     // ik, probably wrong place. TODO
@@ -127,6 +129,8 @@ class AppleDevice(
     }
 
     init {
+        att.onValueChanged = ::applyATTValue
+
         updateMetadata {
             it.copy(
                 name = bluetoothDevice.alias ?: bluetoothDevice.name ?: "Unknown"
@@ -143,15 +147,15 @@ class AppleDevice(
             ConnectionState.CONNECTING
         }
 
-        val success = aacp.connect() // && att.connect()
+        val success = aacp.connect()
 
-        CoroutineScope(Dispatchers.IO).launch {
-            _state.update {
-                it.copy(
-                    loudSoundReductionEnabled = readATTCharacteristic(ATTHandle.LOUD_SOUND_REDUCTION)?.getOrNull(0)?.toInt() == 1,
-                    transparencyData = readATTCharacteristic(ATTHandle.TRANSPARENCY)?: byteArrayOf(),
-                    hearingAidData = readATTCharacteristic(ATTHandle.HEARING_AID)?: byteArrayOf()
-                )
+        if (success) {
+            // read first, then apply: the reads are slow and may fail, a failed read keeps the
+            // last known value instead of resetting it
+            CoroutineScope(Dispatchers.IO).launch {
+                for (handle in ATTHandle.entries) {
+                    att.readCharacteristic(handle)?.let { applyATTValue(handle, it) }
+                }
             }
         }
 
@@ -176,7 +180,7 @@ class AppleDevice(
         }
 
         aacp.disconnect()
-//        att.disconnect()
+        att.disconnect()
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.CINNAMON_BUN) {
             try {
@@ -199,32 +203,34 @@ class AppleDevice(
     suspend fun writeATTCharacteristic(handle: ATTHandle, value: ByteArray): Boolean {
         val success = att.writeCharacteristic(handle, value)
         if (success) {
-            when (handle) {
-                ATTHandle.LOUD_SOUND_REDUCTION -> _state.update { it.copy(loudSoundReductionEnabled = value.getOrNull(0)?.toInt() == 1) }
-                ATTHandle.TRANSPARENCY -> _state.update { it.copy(transparencyData = value) }
-                ATTHandle.HEARING_AID -> _state.update { it.copy(hearingAidData = value) }
-            }
+            applyATTValue(handle, value)
+        } else {
+            Log.w(TAG, "writing $handle failed")
         }
         return success
     }
 
-    // can't use att notifications; keeping ATT connected causes airpods to disconnect every few seconds for some reason
-    // we will poll the characteristic every 1 seconds instead.
+    /**
+     * Polls the characteristic while the returned job is active. The ATT channel stays open
+     * between polls and closes on its own once polling stops.
+     */
     fun observeATTCharacteristic(handle: ATTHandle): Job = CoroutineScope(Dispatchers.IO).launch {
         while (true) {
-            val value = readATTCharacteristic(handle)
-            if (value != null) {
-                when (handle) {
-                    ATTHandle.LOUD_SOUND_REDUCTION -> _state.update { it.copy(loudSoundReductionEnabled = value.getOrNull(0)?.toInt() == 1) }
-                    ATTHandle.TRANSPARENCY -> _state.update { it.copy(transparencyData = value) }
-                    ATTHandle.HEARING_AID -> _state.update { it.copy(hearingAidData = value) }
-                }
-            }
+            att.readCharacteristic(handle)?.let { applyATTValue(handle, it) }
             delay(1000.milliseconds)
         }
     }
 
-    suspend fun readATTCharacteristic(handle: ATTHandle): ByteArray? = att.readCharacteristic(handle)
+    suspend fun readATTCharacteristic(handle: ATTHandle): ByteArray? =
+        att.readCharacteristic(handle, userInitiated = true)?.also { applyATTValue(handle, it) }
+
+    private fun applyATTValue(handle: ATTHandle, value: ByteArray) {
+        when (handle) {
+            ATTHandle.LOUD_SOUND_REDUCTION -> _state.update { it.copy(loudSoundReductionEnabled = value.getOrNull(0)?.toInt() == 1) }
+            ATTHandle.TRANSPARENCY -> _state.update { it.copy(transparencyData = value) }
+            ATTHandle.HEARING_AID -> _state.update { it.copy(hearingAidData = value) }
+        }
+    }
 
     fun requestMicrophoneStream() = aacp.requestMicrophoneStream()
     fun endMicrophoneStream() {

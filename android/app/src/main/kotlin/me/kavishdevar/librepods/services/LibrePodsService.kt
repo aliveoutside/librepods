@@ -45,6 +45,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import me.kavishdevar.librepods.data.xposed.XposedRemotePrefProvider
 import me.kavishdevar.librepods.LibrePodsApplication
 import me.kavishdevar.librepods.R
 import me.kavishdevar.librepods.audio.EldDecoder
@@ -500,7 +501,10 @@ class LibrePodsService: Service() {
                     context = this,
                     bluetoothAdapter = bluetoothAdapter,
                     bluetoothDevice = bluetoothDevice,
-                    currentState = if (isConnectedMethod.invoke(bluetoothDevice) as Boolean) ConnectionState.AVAILABLE else ConnectionState.DISCONNECTED
+                    currentState = if (isConnectedMethod.invoke(bluetoothDevice) as Boolean) ConnectionState.AVAILABLE else ConnectionState.DISCONNECTED,
+                    isAttAvailable = {
+                        XposedRemotePrefProvider.create().getBoolean("vendor_id_hook", false)
+                    }
                 )
             }
 

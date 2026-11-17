@@ -161,7 +161,12 @@ class AppleViewModel(
     }
 
     fun observeATTCharacteristic(handle: ATTHandle) {
-            attObserveJob = device.observeATTCharacteristic(handle)
+        attObserveJob?.cancel()
+        attObserveJob = device.observeATTCharacteristic(handle)
+    }
+
+    override fun onCleared() {
+        stopObservingATTCharacteristic()
     }
     fun stopObservingATTCharacteristic() {
         attObserveJob?.cancel()
